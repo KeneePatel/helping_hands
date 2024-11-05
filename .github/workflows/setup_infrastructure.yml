@@ -27,22 +27,21 @@ jobs:
       run: terraform init
 
     - name: Apply Terraform Plan
-      run: |
-        terraform apply -auto-approve
-        echo "Terraform setup complete."
+      run: terraform apply -auto-approve
 
     - name: Set ACR Credentials for CI/CD
-      id: acr-credentials
       run: |
         ACR_USERNAME=$(terraform output -raw acr_username)
         ACR_PASSWORD=$(terraform output -raw acr_password)
         echo "::set-output name=ACR_USERNAME::${ACR_USERNAME}"
         echo "::set-output name=ACR_PASSWORD::${ACR_PASSWORD}"
 
-    - name: Set GitHub Secrets for ACR Credentials
-      uses: peter-murray/workflow-azure-login@v1
+    - name: Authenticate with GitHub CLI
+      uses: actions/github-script@v6
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set GitHub Secrets for ACR Credentials
       run: |
         gh secret set ACR_USERNAME -b"${{ steps.acr-credentials.outputs.ACR_USERNAME }}"
         gh secret set ACR_PASSWORD -b"${{ steps.acr-credentials.outputs.ACR_PASSWORD }}"
