@@ -22,7 +22,25 @@ data "azurerm_subnet" "existing_subnet" {
   resource_group_name  = data.azurerm_resource_group.existing_rg.name
 }
 
-# Creating Network Interface (NIC)
+# Data source to reference the existing Public IP
+data "azurerm_public_ip" "existing_pip" {
+  name                = "frontend-backend-pip"
+  resource_group_name = data.azurerm_resource_group.existing_rg.name
+}
+
+# Data source to reference the existing Network Security Group (NSG)
+data "azurerm_network_security_group" "existing_nsg" {
+  name                = "frontend-backend-nsg"
+  resource_group_name = data.azurerm_resource_group.existing_rg.name
+}
+
+# Data source to reference the existing Azure Container Registry (ACR)
+data "azurerm_container_registry" "existing_acr" {
+  name                = "frontendbackendacr"
+  resource_group_name = data.azurerm_resource_group.existing_rg.name
+}
+
+# Creating Network Interface (NIC) using existing subnet and public IP
 resource "azurerm_network_interface" "frontend_backend_nic" {
   name                = "frontend-backend-nic"
   location            = data.azurerm_resource_group.existing_rg.location
@@ -32,66 +50,14 @@ resource "azurerm_network_interface" "frontend_backend_nic" {
     name                          = "internal"
     subnet_id                     = data.azurerm_subnet.existing_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.frontend_backend_pip.id
-  }
-}
-
-# Making the vm to be in a static ip
-resource "azurerm_public_ip" "frontend_backend_pip" {
-  name                = "frontend-backend-pip"
-  location            = data.azurerm_resource_group.existing_rg.location
-  resource_group_name = data.azurerm_resource_group.existing_rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-}
-
-# Creating Network Security Group (NSG)
-resource "azurerm_network_security_group" "frontend_backend_nsg" {
-  name                = "frontend-backend-nsg"
-  location            = data.azurerm_resource_group.existing_rg.location
-  resource_group_name = data.azurerm_resource_group.existing_rg.name
-
-  security_rule {
-    name                       = "AllowSSH"
-    priority                   = 1000
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "AllowHTTP3000"
-    priority                   = 1001
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "3000"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "AllowHTTP8080"
-    priority                   = 1002
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "8080"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    public_ip_address_id          = data.azurerm_public_ip.existing_pip.id
   }
 }
 
 # Associating NSG with NIC
 resource "azurerm_network_interface_security_group_association" "frontend_backend_nic_nsg" {
   network_interface_id      = azurerm_network_interface.frontend_backend_nic.id
-  network_security_group_id = azurerm_network_security_group.frontend_backend_nsg.id
+  network_security_group_id = data.azurerm_network_security_group.existing_nsg.id
 }
 
 # Creating the main Virtual Machine using azurerm_linux_virtual_machine
@@ -111,8 +77,8 @@ resource "azurerm_linux_virtual_machine" "frontend_backend_vm" {
   disable_password_authentication = true
 
   os_disk {
-    name              = "frontend-backend-osdisk"
-    caching           = "ReadWrite"
+    name                 = "frontend-backend-osdisk"
+    caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
 
@@ -142,21 +108,8 @@ resource "azurerm_linux_virtual_machine" "frontend_backend_vm" {
       type        = "ssh"
       user        = "azureuser"
       private_key = file("~/.ssh/id_rsa")
-      host        = azurerm_public_ip.frontend_backend_pip.ip_address
+      host        = data.azurerm_public_ip.existing_pip.ip_address
     }
-  }
-}
-
-# Setting up the Azure Container Registry (ACR)
-resource "azurerm_container_registry" "frontend_backend_acr" {
-  name                = "frontendbackendacr"
-  resource_group_name = data.azurerm_resource_group.existing_rg.name
-  location            = data.azurerm_resource_group.existing_rg.location
-  sku                 = "Basic"
-  admin_enabled       = true
-
-  tags = {
-    environment = "development"
   }
 }
 
