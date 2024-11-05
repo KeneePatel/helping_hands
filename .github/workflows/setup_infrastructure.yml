@@ -31,16 +31,21 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
+    - name: Extract Public Key
+      id: ssh-key
+      run: echo "::set-output name=public_key::$(cat ~/.ssh/id_rsa.pub)"
+
     - name: Initialize Terraform
       run: terraform init
       working-directory: terraform
 
     - name: Import Existing Resource Group
-      run: terraform import azurerm_resource_group.frontend_backend_rg /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/frontend-backend-rg
+      run: |
+        terraform import -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" azurerm_resource_group.frontend_backend_rg /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/frontend-backend-rg
       working-directory: terraform
 
     - name: Apply Terraform Plan
-      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ secrets.SSH_PUBLIC_KEY }}" -auto-approve
+      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
       working-directory: terraform
 
     - name: Set ACR Credentials for CI/CD
