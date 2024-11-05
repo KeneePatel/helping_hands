@@ -23,17 +23,13 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Change Directory to Terraform Files
-      run: cd terraform
-
-    - name: FOR DEBUG. list files
-      run: ls -a .
-
     - name: Initialize Terraform
       run: terraform init
+      working-directory: terraform
 
     - name: Apply Terraform Plan
       run: terraform apply -auto-approve
+      working-directory: terraform
 
     - name: Set ACR Credentials for CI/CD
       id: acr-credentials
@@ -42,6 +38,7 @@ jobs:
         ACR_PASSWORD=$(terraform output -raw acr_password)
         echo "::set-output name=ACR_USERNAME::${ACR_USERNAME}"
         echo "::set-output name=ACR_PASSWORD::${ACR_PASSWORD}"
+      working-directory: terraform
 
     - name: Authenticate with GitHub CLI
       uses: actions/github-script@v6
