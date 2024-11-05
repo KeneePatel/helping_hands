@@ -112,7 +112,7 @@ resource "azurerm_linux_virtual_machine" "frontend_backend_vm" {
 
   admin_ssh_key {
     username   = "azureuser"
-    public_key = file("~/.ssh/id_rsa.pub")
+    public_key = var.public_key
   }
 
   disable_password_authentication = true
