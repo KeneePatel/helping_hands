@@ -8,7 +8,7 @@ on:
       - 'frontend/**'
       - 'backend/**'
   workflow_dispatch:
-    description: "Trigger workflow to set up Azure environment with Terraform"
+    description: "Trigger workflow for manual CI/CD push"
 
 jobs:
   cicd:
