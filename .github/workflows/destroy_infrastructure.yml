@@ -32,6 +32,10 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
+    - name: Extract Public Key
+      id: ssh-key
+      run: echo "public_key=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
     - name: Extract Azure Credentials
       id: azure-creds
       run: |
@@ -50,7 +54,7 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ env.subscription_id }}
 
     - name: Plan Terraform Destroy
-      run: terraform plan -destroy -out=tfplan
+      run: terraform plan -destroy -var="subscription_id=${{ env.subscription_id }}" -var="client_id=${{ env.client_id }}" -var="client_secret=${{ env.client_secret }}" -var="tenant_id=${{ env.tenant_id }}" -var="public_key=${{ env.public_key }}" -out=tfplan
       working-directory: terraform
       env:
         ARM_CLIENT_ID: ${{ env.client_id }}
