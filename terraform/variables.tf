@@ -10,6 +10,17 @@ variable "location" {
   default     = "East US"
 }
 
+output "acr_username" {
+  description = "The admin username of the Azure Container Registry"
+  value       = azurerm_container_registry.frontend_backend_acr.admin_username
+}
+
+output "acr_password" {
+  description = "The admin password of the Azure Container Registry"
+  value       = azurerm_container_registry.frontend_backend_acr.admin_password
+  sensitive   = true
+}
+
 variable "public_key" {
   description = "The public SSH key for the virtual machine"
   type        = string
