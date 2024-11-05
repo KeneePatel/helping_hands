@@ -1,0 +1,49 @@
+name: Terraform Setup for Azure
+
+on:
+  workflow_dispatch:
+    description: "Trigger workflow to set up Azure environment with Terraform"
+
+jobs:
+  setup:
+    name: Set Up Azure Environment
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
+
+    - name: Authenticate to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Initialize Terraform
+      run: terraform init
+
+    - name: Apply Terraform Plan
+      run: |
+        terraform apply -auto-approve
+        echo "Terraform setup complete."
+
+    - name: Set ACR Credentials for CI/CD
+      id: acr-credentials
+      run: |
+        ACR_USERNAME=$(terraform output -raw acr_username)
+        ACR_PASSWORD=$(terraform output -raw acr_password)
+        echo "::set-output name=ACR_USERNAME::${ACR_USERNAME}"
+        echo "::set-output name=ACR_PASSWORD::${ACR_PASSWORD}"
+
+    - name: Set GitHub Secrets for ACR Credentials
+      uses: peter-murray/workflow-azure-login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      run: |
+        gh secret set ACR_USERNAME -b"${{ steps.acr-credentials.outputs.ACR_USERNAME }}"
+        gh secret set ACR_PASSWORD -b"${{ steps.acr-credentials.outputs.ACR_PASSWORD }}"
+
