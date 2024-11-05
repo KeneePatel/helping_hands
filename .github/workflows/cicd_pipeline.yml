@@ -27,13 +27,6 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Extract Azure Credentials
-      id: azure-creds
-      run: |
-        echo "acr_login_server=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .acrLoginServer)" >> $GITHUB_ENV
-        echo "acr_username=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)" >> $GITHUB_ENV
-        echo "acr_password=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-
     - name: Set Up SSH Keys
       run: |
         mkdir -p ~/.ssh
@@ -42,6 +35,12 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
+    - name: Get ACR Login Server
+      id: get-acr
+      run: |
+        echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+      working-directory: terraform
+
     - name: Build Docker Images - Frontend and Backend
       run: |
         docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/frontend:latest ./frontend
@@ -49,22 +48,16 @@ jobs:
 
     - name: Login to ACR
       run: |
-        echo "${{ env.acr_password }}" | docker login ${{ env.acr_login_server }} -u ${{ env.acr_username }} --password-stdin
+        echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ env.acr_login_server }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
     - name: Push Docker Images to ACR
       run: |
         docker push ${{ env.acr_login_server }}/frontend:latest
         docker push ${{ env.acr_login_server }}/backend:latest
 
-    - name: Get Public IP of VM
-      id: get-ip
-      run: |
-        echo "vm_ip=$(terraform output -raw frontend_backend_public_ip)" >> $GITHUB_ENV
-      working-directory: terraform
-
     - name: SSH into Azure VM and Deploy Docker Containers
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.vm_ip }} <<EOF
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ secrets.VM_PUBLIC_IP }} <<EOF
           docker pull ${{ env.acr_login_server }}/frontend:latest
           docker pull ${{ env.acr_login_server }}/backend:latest
 
