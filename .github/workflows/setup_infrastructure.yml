@@ -26,6 +26,9 @@ jobs:
     - name: Change Directory to Terraform Files
       run: cd terraform
 
+    - name: FOR DEBUG. list files
+      run: ls -a .
+
     - name: Initialize Terraform
       run: terraform init
 
