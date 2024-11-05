@@ -35,6 +35,10 @@ jobs:
       run: terraform init
       working-directory: terraform
 
+    - name: Import Existing Resource Group
+      run: terraform import azurerm_resource_group.frontend_backend_rg /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/frontend-backend-rg
+      working-directory: terraform
+
     - name: Apply Terraform Plan
       run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ secrets.SSH_PUBLIC_KEY }}" -auto-approve
       working-directory: terraform
