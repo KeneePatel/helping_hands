@@ -14,8 +14,9 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
+      uses: hashicorp/setup-terraform@v2
       with:
+        terraform_version: 1.5.2
         terraform_wrapper: false
 
     - name: Authenticate to Azure
@@ -33,32 +34,31 @@ jobs:
 
     - name: Extract Public Key
       id: ssh-key
-      run: echo "::set-output name=public_key::$(cat ~/.ssh/id_rsa.pub)"
+      run: echo "public_key=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
+    - name: Extract Azure Credentials
+      id: azure-creds
+      run: |
+        echo "client_id=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)" >> $GITHUB_ENV
+        echo "client_secret=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientSecret)" >> $GITHUB_ENV
+        echo "tenant_id=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .tenantId)" >> $GITHUB_ENV
+        echo "subscription_id=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
 
     - name: Initialize Terraform
       run: terraform init
       working-directory: terraform
+      env:
+        ARM_CLIENT_ID: ${{ env.client_id }}
+        ARM_CLIENT_SECRET: ${{ env.client_secret }}
+        ARM_TENANT_ID: ${{ env.tenant_id }}
+        ARM_SUBSCRIPTION_ID: ${{ env.subscription_id }}
 
     - name: Apply Terraform Plan
-      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
+      run: terraform apply -var="subscription_id=${{ env.subscription_id }}" -var="public_key=${{ env.public_key }}" -auto-approve
       working-directory: terraform
-
-    - name: Set ACR Credentials for CI/CD
-      id: acr-credentials
-      run: |
-        ACR_USERNAME=$(terraform output -raw acr_username)
-        ACR_PASSWORD=$(terraform output -raw acr_password)
-        echo "::set-output name=ACR_USERNAME::${ACR_USERNAME}"
-        echo "::set-output name=ACR_PASSWORD::${ACR_PASSWORD}"
-      working-directory: terraform
-
-    - name: Authenticate with GitHub CLI
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set GitHub Secrets for ACR Credentials
-      run: |
-        gh secret set ACR_USERNAME -b"${{ steps.acr-credentials.outputs.ACR_USERNAME }}"
-        gh secret set ACR_PASSWORD -b"${{ steps.acr-credentials.outputs.ACR_PASSWORD }}"
+      env:
+        ARM_CLIENT_ID: ${{ env.client_id }}
+        ARM_CLIENT_SECRET: ${{ env.client_secret }}
+        ARM_TENANT_ID: ${{ env.tenant_id }}
+        ARM_SUBSCRIPTION_ID: ${{ env.subscription_id }}
 
