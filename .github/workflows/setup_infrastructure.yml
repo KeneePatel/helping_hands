@@ -36,7 +36,7 @@ jobs:
       working-directory: terraform
 
     - name: Apply Terraform Plan
-      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -auto-approve
+      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ secrets.SSH_PUBLIC_KEY }}" -auto-approve
       working-directory: terraform
 
     - name: Set ACR Credentials for CI/CD
