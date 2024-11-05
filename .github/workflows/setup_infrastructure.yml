@@ -47,18 +47,8 @@ jobs:
     - name: Initialize Terraform
       run: terraform init
       working-directory: terraform
-      env:
-        ARM_CLIENT_ID: ${{ env.client_id }}
-        ARM_CLIENT_SECRET: ${{ env.client_secret }}
-        ARM_TENANT_ID: ${{ env.tenant_id }}
-        ARM_SUBSCRIPTION_ID: ${{ env.subscription_id }}
 
     - name: Apply Terraform Plan
-      run: terraform apply -var="subscription_id=${{ env.subscription_id }}" -var="public_key=${{ env.public_key }}" -auto-approve
+      run: terraform apply -var="subscription_id=${{ env.subscription_id }}" -var="client_id=${{ env.client_id }}" -var="client_secret=${{ env.client_secret }}" -var="tenant_id=${{ env.tenant_id }}" -var="public_key=${{ env.public_key }}" -auto-approve
       working-directory: terraform
-      env:
-        ARM_CLIENT_ID: ${{ env.client_id }}
-        ARM_CLIENT_SECRET: ${{ env.client_secret }}
-        ARM_TENANT_ID: ${{ env.tenant_id }}
-        ARM_SUBSCRIPTION_ID: ${{ env.subscription_id }}
 
