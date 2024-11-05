@@ -2,7 +2,7 @@ name: Terraform Setup for Azure
 
 on:
   workflow_dispatch:
-    description: "Trigger workflow to set up Azure environment with Terraform"
+    description: "Trigger workflow to clean up and set up Azure environment with Terraform"
 
 jobs:
   setup:
@@ -39,10 +39,10 @@ jobs:
       run: terraform init
       working-directory: terraform
 
-    - name: Import Existing Resource Group
-      run: |
-        terraform import -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" azurerm_resource_group.frontend_backend_rg /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/frontend-backend-rg
+    - name: Destroy Existing Resources
+      run: terraform destroy -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
       working-directory: terraform
+      continue-on-error: true
 
     - name: Apply Terraform Plan
       run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
