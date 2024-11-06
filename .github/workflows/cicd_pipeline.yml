@@ -30,12 +30,6 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Get ACR Login Server
-      id: get-acr
-      run: |
-        echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
-      working-directory: terraform
-
     - name: Azure CLI Login with Service Principal
       env:
         AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
@@ -48,14 +42,27 @@ jobs:
         az login --service-principal -u $client_id -p $client_secret --tenant $tenant_id
         az account set --subscription $subscription_id
 
-    - name: Login to ACR
+    - name: Initialize Terraform
+      run: terraform init -reconfigure
+      working-directory: terraform
+
+    - name: Get ACR Login Server
+      id: get-acr
       run: |
-        az acr login --name ${{ env.acr_login_server }}
+        echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+      working-directory: terraform
 
     - name: Build Docker Images - Frontend and Backend
       run: |
         docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/frontend:latest ./frontend
         docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/backend:latest ./backend
+
+    - name: Login to ACR
+      env:
+        ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+        ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+      run: |
+        echo "${{ env.ACR_PASSWORD }}" | docker login ${{ env.acr_login_server }} -u ${{ env.ACR_USERNAME }} --password-stdin
 
     - name: Push Docker Images to ACR
       run: |
