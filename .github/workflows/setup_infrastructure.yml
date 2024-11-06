@@ -86,6 +86,7 @@ jobs:
     # Save plan to artifacts  
     - name: Publish Terraform Plan
       uses: actions/upload-artifact@v4
+      working-directory: terraform
       with:
         name: tfplan
         path: tfplan
@@ -93,6 +94,7 @@ jobs:
     # Create string output of Terraform Plan
     - name: Create String Output
       id: tf-plan-string
+      working-directory: terraform
       run: |
         TERRAFORM_PLAN=$(terraform show -no-color tfplan)
         
