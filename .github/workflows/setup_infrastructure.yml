@@ -82,7 +82,7 @@ jobs:
             VM_PUBLIC_IP: process.env.vm_ip
           };
           for (const [key, value] of Object.entries(secrets)) {
-            await github.actions.createOrUpdateRepoSecret({
+            await octokit.actions.createOrUpdateRepoSecret({
               owner: context.repo.owner,
               repo: context.repo.repo,
               secret_name: key,
