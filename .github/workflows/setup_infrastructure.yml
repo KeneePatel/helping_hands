@@ -51,6 +51,7 @@ jobs:
     # An exit code of 0 indicated no changes, 1 a terraform failure, 2 there are pending changes.
     - name: Terraform Plan
       id: tf-plan
+      working-directory: terraform
       run: |
         export exitcode=0
         terraform plan -detailed-exitcode -no-color -out tfplan || export exitcode=$?
@@ -63,7 +64,6 @@ jobs:
         else 
           exit 0
         fi
-      working-directory: terraform
         
     # Save plan to artifacts  
     - name: Publish Terraform Plan
@@ -71,7 +71,6 @@ jobs:
       with:
         name: tfplan
         path: tfplan
-      working-directory: terraform
         
     # Create string output of Terraform Plan
     - name: Create String Output
