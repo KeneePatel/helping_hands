@@ -36,35 +36,46 @@ jobs:
       run: echo "::set-output name=public_key::$(cat ~/.ssh/id_rsa.pub)"
 
     - name: Initialize Terraform
-      run: terraform init
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      run: terraform init -reconfigure
       working-directory: terraform
 
     - name: Apply Terraform Plan
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
       working-directory: terraform
 
-    - name: Extract ACR Credentials
-      id: acr-credentials
+    - name: Extract ACR Credentials and VM IP
+      id: acr-creds
       run: |
         echo "acr_username=$(terraform output -raw acr_username)" >> $GITHUB_ENV
         echo "acr_password=$(terraform output -raw acr_password)" >> $GITHUB_ENV
-      working-directory: terraform
-
-    - name: Extract VM Public IP
-      id: vm-ip
-      run: |
         echo "vm_ip=$(terraform output -raw frontend_backend_public_ip)" >> $GITHUB_ENV
       working-directory: terraform
 
-    - name: Authenticate with GitHub CLI
+    - name: Set GitHub Secrets for ACR Credentials and VM IP
       uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set GitHub Secrets for ACR Credentials and VM IP
-      run: |
-        gh secret set ACR_USERNAME -b"${{ env.acr_username }}"
-        gh secret set ACR_PASSWORD -b"${{ env.acr_password }}"
-        gh secret set VM_PUBLIC_IP -b"${{ env.vm_ip }}"
-
+        script: |
+          const secrets = {
+            ACR_USERNAME: process.env.acr_username,
+            ACR_PASSWORD: process.env.acr_password,
+            VM_PUBLIC_IP: process.env.vm_ip
+          }
+          for (const [key, value] of Object.entries(secrets)) {
+            github.actions.createOrUpdateSecretForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              secret_name: key,
+              encrypted_value: value
+            })
 
