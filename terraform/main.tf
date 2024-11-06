@@ -1,13 +1,3 @@
-# setting backend to use Azure Storage
-terraform {
-  backend "azurerm" {
-    resource_group_name  = "terraform-backend-rg"
-    storage_account_name = "statestorage2804"
-    container_name       = "tfstate"
-    key                  = "terraform.tfstate"
-  }
-}
-
 # making resource group
 resource "azurerm_resource_group" "frontend_backend_rg" {
   name     = "frontend-backend-rg"
