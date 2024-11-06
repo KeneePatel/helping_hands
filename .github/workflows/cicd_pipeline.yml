@@ -22,11 +22,6 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    - name: Authenticate to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
     - name: Set Up SSH Keys
       run: |
         mkdir -p ~/.ssh
@@ -35,37 +30,32 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Extract Azure Service Principal Credentials
-      id: azure-sp-creds
-      run: |
-        echo "ARM_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
-        echo "ARM_TENANT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .tenantId)" >> $GITHUB_ENV
-
-    - name: Initialize Terraform
-      run: terraform init -reconfigure
-      working-directory: terraform
-      env:
-        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ env.ARM_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
-
     - name: Get ACR Login Server
       id: get-acr
       run: |
         echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
       working-directory: terraform
 
+    - name: Azure CLI Login with Service Principal
+      env:
+        AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      run: |
+        client_id=$(echo $AZURE_CREDENTIALS | jq -r .clientId)
+        client_secret=$(echo $AZURE_CREDENTIALS | jq -r .clientSecret)
+        tenant_id=$(echo $AZURE_CREDENTIALS | jq -r .tenantId)
+        subscription_id=$(echo $AZURE_CREDENTIALS | jq -r .subscriptionId)
+
+        az login --service-principal -u $client_id -p $client_secret --tenant $tenant_id
+        az account set --subscription $subscription_id
+
+    - name: Login to ACR
+      run: |
+        az acr login --name ${{ env.acr_login_server }}
+
     - name: Build Docker Images - Frontend and Backend
       run: |
         docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/frontend:latest ./frontend
         docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/backend:latest ./backend
-
-    - name: Login to ACR
-      run: |
-        echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ env.acr_login_server }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
     - name: Push Docker Images to ACR
       run: |
