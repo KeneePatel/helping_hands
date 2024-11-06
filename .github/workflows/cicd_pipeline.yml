@@ -35,6 +35,10 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
+    - name: Initialize Terraform
+      run: terraform init -reconfigure
+      working-directory: terraform
+
     - name: Get ACR Login Server
       id: get-acr
       run: |

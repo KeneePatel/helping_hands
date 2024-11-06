@@ -1,26 +1,22 @@
-name: CI/CD for Application Deployment
+name: Terraform Setup for Azure
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'frontend/**'
-      - 'backend/**'
   workflow_dispatch:
-    description: "Trigger workflow for manual CI/CD push"
+    description: "Trigger workflow to set up Azure environment with Terraform"
 
 jobs:
-  cicd:
-    name: CI/CD for Application
+  setup:
+    name: Set Up Azure Environment
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
 
     - name: Authenticate to Azure
       uses: azure/login@v1
@@ -35,42 +31,40 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
+    - name: Extract Public Key
+      id: ssh-key
+      run: echo "::set-output name=public_key::$(cat ~/.ssh/id_rsa.pub)"
+
     - name: Initialize Terraform
-      run: terraform init -reconfigure
+      run: terraform init
       working-directory: terraform
 
-    - name: Get ACR Login Server
-      id: get-acr
-      run: |
-        echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+    - name: Apply Terraform Plan
+      run: terraform apply -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="public_key=${{ steps.ssh-key.outputs.public_key }}" -auto-approve
       working-directory: terraform
 
-    - name: Build Docker Images - Frontend and Backend
+    - name: Extract ACR Credentials
+      id: acr-credentials
       run: |
-        docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/frontend:latest ./frontend
-        docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/backend:latest ./backend
+        echo "acr_username=$(terraform output -raw acr_username)" >> $GITHUB_ENV
+        echo "acr_password=$(terraform output -raw acr_password)" >> $GITHUB_ENV
+      working-directory: terraform
 
-    - name: Login to ACR
+    - name: Extract VM Public IP
+      id: vm-ip
       run: |
-        echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ env.acr_login_server }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
+        echo "vm_ip=$(terraform output -raw frontend_backend_public_ip)" >> $GITHUB_ENV
+      working-directory: terraform
 
-    - name: Push Docker Images to ACR
+    - name: Authenticate with GitHub CLI
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set GitHub Secrets for ACR Credentials and VM IP
       run: |
-        docker push ${{ env.acr_login_server }}/frontend:latest
-        docker push ${{ env.acr_login_server }}/backend:latest
+        gh secret set ACR_USERNAME -b"${{ env.acr_username }}"
+        gh secret set ACR_PASSWORD -b"${{ env.acr_password }}"
+        gh secret set VM_PUBLIC_IP -b"${{ env.vm_ip }}"
 
-    - name: SSH into Azure VM and Deploy Docker Containers
-      run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ secrets.VM_PUBLIC_IP }} <<EOF
-          docker pull ${{ env.acr_login_server }}/frontend:latest
-          docker pull ${{ env.acr_login_server }}/backend:latest
-
-          # Stop and remove any existing containers
-          docker stop frontend || true && docker rm frontend || true
-          docker stop backend || true && docker rm backend || true
-
-          # Run the updated Docker containers
-          docker run -d --name frontend -p 3000:3000 ${{ env.acr_login_server }}/frontend:latest
-          docker run -d --name backend -p 8080:8080 ${{ env.acr_login_server }}/backend:latest
-        EOF
 
