@@ -80,12 +80,13 @@ jobs:
             ACR_USERNAME: process.env.acr_username,
             ACR_PASSWORD: process.env.acr_password,
             VM_PUBLIC_IP: process.env.vm_ip
-          }
+          };
           for (const [key, value] of Object.entries(secrets)) {
-            github.actions.createOrUpdateSecretForRepo({
+            await github.actions.createOrUpdateRepoSecret({
               owner: context.repo.owner,
               repo: context.repo.repo,
               secret_name: key,
               encrypted_value: value
-            })
+            });
+          }
 
