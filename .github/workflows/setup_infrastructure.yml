@@ -1,6 +1,9 @@
 name: Terraform Setup for Azure
 
 on:
+  push:
+    path:
+      - .github/workflows/setup_infrastructure.yml
   workflow_dispatch:
     description: "Trigger workflow to set up Azure environment with Terraform"
 
