@@ -1,19 +1,92 @@
-- name: Set GitHub Secrets for ACR Credentials and VM IP
-  uses: actions/github-script@v6
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    script: |
-      const secrets = {
-        ACR_USERNAME: process.env.acr_username,
-        ACR_PASSWORD: process.env.acr_password,
-        VM_PUBLIC_IP: process.env.vm_ip
-      };
-      for (const [key, value] of Object.entries(secrets)) {
-        await github.rest.actions.createOrUpdateRepoSecret({
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          secret_name: key,
-          encrypted_value: value
-        });
-      }
+name: Terraform Setup for Azure
+
+on:
+  workflow_dispatch:
+    description: "Trigger workflow to set up Azure environment with Terraform"
+
+jobs:
+  setup:
+    name: Set Up Azure Environment
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
+
+    - name: Set Up SSH Keys
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+        chmod 600 ~/.ssh/id_rsa
+        chmod 644 ~/.ssh/id_rsa.pub
+
+    - name: Extract Public Key
+      id: ssh-key
+      run: echo "::set-output name=public_key::$(cat ~/.ssh/id_rsa.pub)"
+
+    - name: Extract Azure Service Principal Credentials from AZURE_CREDENTIALS
+      id: azure-sp-creds
+      run: |
+        echo "ARM_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientSecret)" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .tenantId)" >> $GITHUB_ENV
+
+    - name: Initialize Terraform
+      env:
+        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ env.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
+      run: terraform init -reconfigure
+      working-directory: terraform
+
+    - name: Apply Terraform Plan
+      env:
+        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ env.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
+      run: |
+        terraform apply \
+          -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
+          -var="client_id=${{ env.ARM_CLIENT_ID }}" \
+          -var="client_secret=${{ env.ARM_CLIENT_SECRET }}" \
+          -var="tenant_id=${{ env.ARM_TENANT_ID }}" \
+          -var="public_key=${{ steps.ssh-key.outputs.public_key }}" \
+          -auto-approve
+      working-directory: terraform
+
+    - name: Extract ACR Credentials and VM IP
+      id: acr-creds
+      run: |
+        echo "acr_username=$(terraform output -raw acr_username)" >> $GITHUB_ENV
+        echo "acr_password=$(terraform output -raw acr_password)" >> $GITHUB_ENV
+        echo "vm_ip=$(terraform output -raw frontend_backend_public_ip)" >> $GITHUB_ENV
+      working-directory: terraform
+
+    - name: Set GitHub Secrets for ACR Credentials and VM IP
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const secrets = {
+            ACR_USERNAME: process.env.acr_username,
+            ACR_PASSWORD: process.env.acr_password,
+            VM_PUBLIC_IP: process.env.vm_ip
+          };
+          for (const [key, value] of Object.entries(secrets)) {
+            await github.rest.actions.createOrUpdateRepoSecret({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              secret_name: key,
+              encrypted_value: value
+            });
+          }
 
