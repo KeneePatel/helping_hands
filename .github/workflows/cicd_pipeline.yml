@@ -10,18 +10,53 @@ on:
   workflow_dispatch:
     description: "Trigger workflow for manual CI/CD push"
 
+# Special permissions required for OIDC authentication
+permissions:
+  id-token: write
+  contents: read
+
+# These environment variables are used by the terraform azure provider to setup OIDD authenticate. 
+env:
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
+  ARM_CLIENT_SECRET: "${{ secrets.AZURE_CLIENT_SECRET }}"
+  ARM_SUBSCRIPTION_ID: "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+  ARM_TENANT_ID: "${{ secrets.AZURE_TENANT_ID }}"
+
 jobs:
   cicd:
     name: CI/CD for Application
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v2
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+    # Login to azure cli
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'        
 
+    # Install the latest version of the Terraform CLI
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
+      run: terraform init
+      working-directory: terraform
+
+    # Checks that all Terraform configuration files adhere to a canonical format
+    # Will fail the build if not
+    - name: Terraform Format
+      run: terraform fmt -check
+      working-directory: terraform
+
+    # setup ssh keys for authentication with vm
     - name: Set Up SSH Keys
       run: |
         mkdir -p ~/.ssh
@@ -30,33 +65,16 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Extract Azure Service Principal Credentials
-      id: azure-sp-creds
-      run: |
-        echo "ARM_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
-        echo "ARM_TENANT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .tenantId)" >> $GITHUB_ENV
-
-    - name: Initialize Terraform
-      env:
-        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ env.ARM_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
-      run: terraform init -reconfigure
-      working-directory: terraform
-
     - name: Get ACR Login Server
       id: get-acr
       run: |
-        echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+        echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
       working-directory: terraform
 
     - name: Build Docker Images - Frontend and Backend
       run: |
-        docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/frontend:latest ./frontend
-        docker buildx build --platform linux/amd64 -t ${{ env.acr_login_server }}/backend:latest ./backend
+        docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/frontend:latest ./frontend
+        docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/backend:latest ./backend
 
     - name: Login to ACR
       env:
