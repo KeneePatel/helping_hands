@@ -7,6 +7,7 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
+      - '.github/workflows/cicd_pipeline.yml'
   workflow_dispatch:
     description: "Trigger workflow for manual CI/CD push"
 
@@ -65,23 +66,24 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Get ACR Login Server
+    - name: Get ACR Credentials
       id: get-acr
       run: |
         echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
+        echo "ACR_USERNAME=$(terraform output -raw acr_username)" >> $GITHUB_ENV
+        echo "ACR_PASSWORD=$(terraform output -raw acr_password)" >> $GITHUB_ENV
       working-directory: terraform
+
+    - uses: azure/docker-login@v2
+      with:
+        login-server: ${{ env.acr_login_server }}
+        username: ${{ env.ACR_USERNAME }}
+        password: ${{ env.ACR_PASSWORD }}
 
     - name: Build Docker Images - Frontend and Backend
       run: |
         docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/frontend:latest ./frontend
         docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/backend:latest ./backend
-
-    - name: Login to ACR
-      env:
-        ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-        ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-      run: |
-        echo "${{ env.ACR_PASSWORD }}" | docker login ${{ env.acr_login_server }} -u ${{ env.ACR_USERNAME }} --password-stdin
 
     - name: Push Docker Images to ACR
       run: |
