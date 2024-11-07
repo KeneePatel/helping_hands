@@ -97,7 +97,7 @@ resource "azurerm_linux_virtual_machine" "frontend_backend_vm" {
   location              = azurerm_resource_group.frontend_backend_rg.location
   resource_group_name   = azurerm_resource_group.frontend_backend_rg.name
   network_interface_ids = [azurerm_network_interface.frontend_backend_nic.id]
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2s"
   admin_username        = "azureuser"
 
   admin_ssh_key {
