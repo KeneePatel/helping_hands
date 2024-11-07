@@ -66,12 +66,13 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Get ACR Credentials
+    - name: Get ACR Credentials and VM public IP
       id: get-acr
       run: |
         echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_ENV
         echo "ACR_USERNAME=$(terraform output -raw acr_username)" >> $GITHUB_ENV
         echo "ACR_PASSWORD=$(terraform output -raw acr_password)" >> $GITHUB_ENV
+        echo "VM_PUBLIC_IP=$(terraform output -raw frontend_backend_public_ip)" >> $GITHUB_ENV
       working-directory: terraform
 
     - name: Login to ACR
@@ -93,16 +94,16 @@ jobs:
 
     - name: SSH into Azure VM and Deploy Docker Containers
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ secrets.VM_PUBLIC_IP }} <<EOF
-          docker pull ${{ env.acr_login_server }}/frontend:latest
-          docker pull ${{ env.acr_login_server }}/backend:latest
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.VM_PUBLIC_IP }} <<EOF
+          docker pull ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
+          docker pull ${{ env.ACR_LOGIN_SERVER }}/backend:latest
 
           # Stop and remove any existing containers
           docker stop frontend || true && docker rm frontend || true
           docker stop backend || true && docker rm backend || true
 
           # Run the updated Docker containers
-          docker run -d --name frontend -p 3000:3000 ${{ env.acr_login_server }}/frontend:latest
-          docker run -d --name backend -p 8080:8080 ${{ env.acr_login_server }}/backend:latest
+          docker run -d --name frontend -p 3000:3000 ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
+          docker run -d --name backend -p 8080:8080 ${{ env.ACR_LOGIN_SERVER }}/backend:latest
         EOF
 
