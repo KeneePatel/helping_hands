@@ -96,7 +96,7 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.VM_PUBLIC_IP }} <<EOF
 
-          docker login ${{ env.ACR_LOGIN_SERVER }} -u ${{ env.ACR_USERNAME }} -p ${{ env.ACR_PASSWORD }}
+          echo ${{ env.ACR_PASSWORD }} | docker login ${{ env.ACR_LOGIN_SERVER }} -u ${{ env.ACR_USERNAME }} --password-stdin
           
           docker image prune -af
 
