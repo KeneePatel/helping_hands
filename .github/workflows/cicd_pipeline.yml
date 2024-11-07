@@ -107,7 +107,7 @@ jobs:
           docker stop backend || true && docker rm backend || true
 
           # Run the updated Docker containers
-          docker run -d --name frontend -p 3000:3000 ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
-          docker run -d --name backend -p 8080:8080 ${{ env.ACR_LOGIN_SERVER }}/backend:latest
+          docker run -d --name frontend -p 3000:3000 -e NEXT_PUBLIC_API_URL=${{ env.VM_PUBLIC_IP }} -e NEXT_PUBLIC_AUTH_URL=${{ env.VM_PUBLIC_IP }} ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
+          docker run -d --name backend -p 8080:8080 -e PORT=8080 -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e FRONTEND_URL=${{ env.VM_PUBLIC_IP }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} ${{ env.ACR_LOGIN_SERVER }}/backend:latest
         EOF
 
