@@ -76,7 +76,7 @@ jobs:
 
     - uses: azure/docker-login@v2
       with:
-        login-server: ${{ env.acr_login_server }}
+        login-server: ${{ env.ACR_LOGIN_SERVER }}
         username: ${{ env.ACR_USERNAME }}
         password: ${{ env.ACR_PASSWORD }}
 
