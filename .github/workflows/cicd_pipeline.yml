@@ -95,6 +95,10 @@ jobs:
     - name: SSH into Azure VM and Deploy Docker Containers
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.VM_PUBLIC_IP }} <<EOF
+
+          echo ${{ env.ACR_LOGIN_SERVER }}
+          docker login ${{ env.ACR_LOGIN_SERVER }} -u ${{ env.ACR_USERNAME }} -p ${{ env.ACR_PASSWORD }}
+
           docker pull ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
           docker pull ${{ env.ACR_LOGIN_SERVER }}/backend:latest
 
