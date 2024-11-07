@@ -7,7 +7,7 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
-      - '.github/workflows/cicd_pipeline.yml'
+      - '**/cicd_pipeline.yml'
   workflow_dispatch:
     description: "Trigger workflow for manual CI/CD push"
 
