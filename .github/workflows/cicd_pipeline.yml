@@ -74,7 +74,8 @@ jobs:
         echo "ACR_PASSWORD=$(terraform output -raw acr_password)" >> $GITHUB_ENV
       working-directory: terraform
 
-    - uses: azure/docker-login@v2
+    - name: Login to ACR
+      uses: azure/docker-login@v2
       with:
         login-server: ${{ env.ACR_LOGIN_SERVER }}
         username: ${{ env.ACR_USERNAME }}
@@ -82,6 +83,7 @@ jobs:
 
     - name: Build Docker Images - Frontend and Backend
       run: |
+        echo ${{ env.ACR_LOGIN_SERVER }}
         docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/frontend:latest ./frontend
         docker buildx build --platform linux/amd64 -t ${{ env.ACR_LOGIN_SERVER }}/backend:latest ./backend
 
